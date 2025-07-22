@@ -3,11 +3,20 @@ import CreateNoteModal from './CreateNoteModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import ContentSidebar from './ContentSidebar';
 import NoteCard from './NoteCard';
-import { LoadingSpinner, ErrorState, EmptyContentState, EmptySearchState } from './LoadingStates';
-import { useCreateContentMutation, useDeleteContentMutation, useUpdateContentMutation } from '../services/api';
-import { useGetAllContentQuery } from '../services/api';
+import {
+  LoadingSpinner,
+  ErrorState,
+  EmptyContentState,
+  EmptySearchState,
+} from './LoadingStates';
+import {
+  useCreateContentMutation,
+  useDeleteContentMutation,
+  useUpdateContentMutation,
+  useGetAllContentQuery,
+  useMeQuery,
+} from '../services/api';
 import { ContentItem } from '../types';
-import { useMeQuery } from '../services/api';
 
 export default function Content() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -16,26 +25,28 @@ export default function Content() {
   const [editContent, setEditContent] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
+
   const [createContent, { isLoading: isCreating, error: createError }] = useCreateContentMutation();
   const [deleteContent, { isLoading: isDeleting }] = useDeleteContentMutation();
   const [updateContent, { isLoading: isUpdating }] = useUpdateContentMutation();
 
   const { data, isLoading, error } = useGetAllContentQuery();
-  const [activeTab, setActiveTab] = useState('all');
   const { data: userData } = useMeQuery();
+
+  const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Loading states
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorState />;
-  if (!data || !data.data) return <EmptyContentState onCreateNote={() => setShowCreateModal(true)} />;
+  if (!data || !data.data) {
+    return <EmptyContentState onCreateNote={() => setShowCreateModal(true)} />;
+  }
 
-  const contentData = (data && Array.isArray(data.data)) ? data.data : [];  
+  const contentData = Array.isArray(data.data) ? data.data : [];
   const filteredContent = contentData.filter(item =>
     item.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Handler functions
   const handleEdit = (id: string, content: string) => {
     setEditingId(id);
     setEditContent(content);
@@ -63,7 +74,6 @@ export default function Content() {
 
   const handleCreateNote = async () => {
     if (!newContent.trim()) return;
-    
     try {
       await createContent({ content: newContent }).unwrap();
       setNewContent('');
@@ -75,7 +85,6 @@ export default function Content() {
 
   const handleDeleteConfirm = async () => {
     if (!deleteItemId) return;
-    
     try {
       await deleteContent(deleteItemId).unwrap();
       setShowDeleteModal(false);
@@ -90,39 +99,16 @@ export default function Content() {
     setDeleteItemId(null);
   };
 
-  // Show empty search state if no results
-  if (searchQuery && filteredContent.length === 0) {
-    return (
-      <>
-        <ContentSidebar
-          userData={userData}
-          contentData={contentData}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onCreateNote={() => setShowCreateModal(true)}
-        />
+  const renderNotes = () => {
+    if (searchQuery && filteredContent.length === 0) {
+      return (
         <div className="flex-1 flex flex-col overflow-hidden">
           <EmptySearchState onCreateNote={() => setShowCreateModal(true)} />
         </div>
-      </>
-    );
-  }
+      );
+    }
 
-  return (
-    <>
-      <ContentSidebar
-        userData={userData}
-        contentData={contentData}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        onCreateNote={() => setShowCreateModal(true)}
-      />
-
-      {/* Main Content Area */}
+    return (
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
@@ -167,19 +153,37 @@ export default function Content() {
           </div>
         </div>
       </div>
+    );
+  };
 
-      {/* Create Note Modal */}
+  return (
+    <>
+      <div className="flex h-full">
+        <ContentSidebar
+          userData={userData}
+          contentData={contentData}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onCreateNote={() => setShowCreateModal(true)}
+        />
+        {renderNotes()}
+      </div>
+
       <CreateNoteModal
         show={showCreateModal}
         newContent={newContent}
         isCreating={isCreating}
         createError={!!createError}
         onContentChange={setNewContent}
-        onCancel={() => { setShowCreateModal(false); setNewContent(''); }}
+        onCancel={() => {
+          setShowCreateModal(false);
+          setNewContent('');
+        }}
         onCreate={handleCreateNote}
       />
 
-      {/* Delete Confirmation Modal */}
       <DeleteConfirmModal
         show={showDeleteModal}
         isDeleting={isDeleting}
